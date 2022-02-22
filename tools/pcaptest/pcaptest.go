@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/miekg/pcap"
+	"github.com/polygon-io/go-lib-pcap"
 )
 
 func min(x uint32, y uint32) uint32 {

@@ -44,8 +44,12 @@ func NewReader(reader io.Reader) (*Reader, error) {
 	}
 	switch magic := r.readUint32(); magic {
 	case 0xa1b2c3d4:
+		fallthrough
+	case 0xa1b23c4d:
 		r.flip = false
 	case 0xd4c3b2a1:
+		fallthrough
+	case 0x4d3cb2a1:
 		r.flip = true
 	default:
 		return nil, fmt.Errorf("pcap: bad magic number: %0x", magic)

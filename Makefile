@@ -6,7 +6,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/miekg/pcap"
+	"github.com/polygon-io/go-lib-pcap"
 )
 
 func main() {

@@ -9,7 +9,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/miekg/pcap"
+	"github.com/polygon-io/go-lib-pcap"
 )
 
 var input *string = flag.String("input", "", "input file")

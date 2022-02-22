@@ -25,7 +25,6 @@ type FileHeader struct {
 
 // Reader parses pcap files.
 type Reader struct {
-	flip         bool
 	buf          io.Reader
 	err          error
 	fourBytes    []byte
@@ -44,13 +43,9 @@ func NewReader(reader io.Reader) (*Reader, error) {
 	}
 	switch magic := r.readUint32(); magic {
 	case 0xa1b2c3d4:
-		fallthrough
-	case 0xa1b23c4d:
-		r.flip = false
+		break
 	case 0xd4c3b2a1:
-		fallthrough
-	case 0x4d3cb2a1:
-		r.flip = true
+		break
 	default:
 		return nil, fmt.Errorf("pcap: bad magic number: %0x", magic)
 	}
@@ -67,18 +62,17 @@ func NewReader(reader io.Reader) (*Reader, error) {
 }
 
 // Next returns the next packet or nil if no more packets can be read.
-func (r *Reader) Next() *Packet {
+func (r *Reader) Next(data []byte) *Packet {
 	d := r.sixteenBytes
 	r.err = r.read(d)
 	if r.err != nil {
 		return nil
 	}
-	timeSec := asUint32(d[0:4], r.flip)
-	timeUsec := asUint32(d[4:8], r.flip)
-	capLen := asUint32(d[8:12], r.flip)
-	origLen := asUint32(d[12:16], r.flip)
+	timeSec := asUint32(d[0:4])
+	timeUsec := asUint32(d[4:8])
+	capLen := asUint32(d[8:12])
+	origLen := asUint32(d[12:16])
 
-	data := make([]byte, capLen)
 	if r.err = r.read(data); r.err != nil {
 		return nil
 	}
@@ -109,7 +103,7 @@ func (r *Reader) readUint32() uint32 {
 	if r.err = r.read(data); r.err != nil {
 		return 0
 	}
-	return asUint32(data, r.flip)
+	return asUint32(data)
 }
 
 func (r *Reader) readInt32() int32 {
@@ -117,7 +111,7 @@ func (r *Reader) readInt32() int32 {
 	if r.err = r.read(data); r.err != nil {
 		return 0
 	}
-	return int32(asUint32(data, r.flip))
+	return int32(asUint32(data))
 }
 
 func (r *Reader) readUint16() uint16 {
@@ -125,7 +119,7 @@ func (r *Reader) readUint16() uint16 {
 	if r.err = r.read(data); r.err != nil {
 		return 0
 	}
-	return asUint16(data, r.flip)
+	return asUint16(data)
 }
 
 // Writer writes a pcap file.
@@ -167,16 +161,10 @@ func (w *Writer) Write(pkt *Packet) error {
 	return err
 }
 
-func asUint32(data []byte, flip bool) uint32 {
-	if flip {
-		return binary.BigEndian.Uint32(data)
-	}
+func asUint32(data []byte) uint32 {
 	return binary.LittleEndian.Uint32(data)
 }
 
-func asUint16(data []byte, flip bool) uint16 {
-	if flip {
-		return binary.BigEndian.Uint16(data)
-	}
+func asUint16(data []byte) uint16 {
 	return binary.LittleEndian.Uint16(data)
 }

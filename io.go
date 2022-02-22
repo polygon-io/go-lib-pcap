@@ -73,6 +73,7 @@ func (r *Reader) Next(data []byte) *Packet {
 	capLen := asUint32(d[8:12])
 	origLen := asUint32(d[12:16])
 
+	data = data[:capLen]
 	if r.err = r.read(data); r.err != nil {
 		return nil
 	}

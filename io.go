@@ -31,10 +31,12 @@ type Reader struct {
 	fourBytes    []byte
 	twoBytes     []byte
 	sixteenBytes []byte
+	PacketData   []byte
 	Header       FileHeader
 }
 
 // NewReader reads pcap data from an io.Reader.
+// https://tools.ietf.org/id/draft-gharris-opsawg-pcap-00.html#section-4-5.2.1
 func NewReader(reader io.Reader) (*Reader, error) {
 	r := &Reader{
 		buf:          reader,
@@ -55,7 +57,7 @@ func NewReader(reader io.Reader) (*Reader, error) {
 		return nil, fmt.Errorf("pcap: bad magic number: %0x", magic)
 	}
 	r.Header = FileHeader{
-		MagicNumber:  0xa1b2c3d4,
+		MagicNumber:  0xa1b23c4d,
 		VersionMajor: r.readUint16(),
 		VersionMinor: r.readUint16(),
 		TimeZone:     r.readInt32(),
@@ -63,6 +65,7 @@ func NewReader(reader io.Reader) (*Reader, error) {
 		SnapLen:      r.readUint32(),
 		LinkType:     r.readUint32(),
 	}
+	// r.PacketData = make([]byte, 0, r.Header.SnapLen)
 	return r, nil
 }
 

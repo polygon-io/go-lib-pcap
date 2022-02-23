@@ -21,7 +21,7 @@ type Packet struct {
 	Caplen uint32    // bytes stored in the file (caplen <= len)
 	Len    uint32    // bytes sent/received
 
-	Data []byte // packet data
+	Data   []byte // packet data
 
 	Type    int // protocol type, see LINKTYPE_*
 	DestMac uint64
@@ -33,7 +33,6 @@ type Packet struct {
 
 // Decode decodes the headers of a Packet.
 func (p *Packet) Decode() error {
-
 	if len(p.Data) <= 14 {
 		return errors.New("invalid header")
 	}

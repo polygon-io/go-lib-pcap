@@ -4,8 +4,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"sync"
 	"time"
+
+	pool "github.com/polygon-io/go-lib-bpool"
 )
 
 // FileHeader is the parsed header of a pcap file.
@@ -32,14 +33,14 @@ type Reader struct {
 	fourBytes    []byte
 	twoBytes     []byte
 	sixteenBytes []byte
-	DataPool     sync.Pool
+	DataPool     *pool.BPool
 	Header       FileHeader
 }
 
 // NewReader reads pcap data from an io.Reader.
 // https://tools.ietf.org/id/draft-gharris-opsawg-pcap-00.html#section-4-5.2.1
-func NewReader(reader io.Reader) (*Reader, error) {
-	r := &Reader{
+func NewReader(reader io.Reader) (r *Reader, err error) {
+	r = &Reader{
 		buf:          reader,
 		fourBytes:    make([]byte, 4),
 		twoBytes:     make([]byte, 2),
@@ -66,16 +67,9 @@ func NewReader(reader io.Reader) (*Reader, error) {
 		SnapLen:      r.readUint32(),
 		LinkType:     r.readUint32(),
 	}
-	r.DataPool = sync.Pool{
-		New: func() interface{} {
-			// The Pool's New function should generally only return pointer
-			// types, since a pointer can be put into the return interface
-			// value without an allocation:
-			return make([]byte, r.Header.SnapLen)
-		},
-	}
+	r.DataPool = pool.NewBPool(100000, int(r.Header.SnapLen))
 	// r.PacketData = make([]byte, 0, r.Header.SnapLen)
-	return r, nil
+	return r, err
 }
 
 // Next returns the next packet or nil if no more packets can be read.
@@ -90,20 +84,17 @@ func (r *Reader) Next() *Packet {
 	capLen := asUint32(d[8:12], r.flip)
 	origLen := asUint32(d[12:16], r.flip)
 
-	data := r.DataPool.Get().([]byte)
-	if r.err = r.read(data); r.err != nil {
+	pod := r.DataPool.Get()
+	if r.err = r.read(pod.Bytes); r.err != nil {
 		return nil
 	}
 	return &Packet{
 		Time:   time.Unix(int64(timeSec), int64(timeUsec)),
 		Caplen: capLen,
 		Len:    origLen,
-		Data:   data,
+		Data:   pod.Bytes,
+		Pod:    pod,
 	}
-}
-
-func (r *Reader) Free(packet *Packet) {
-	r.DataPool.Put(packet.Data)
 }
 
 func (r *Reader) read(data []byte) error {

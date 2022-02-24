@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"time"
+
+	pool "github.com/polygon-io/go-lib-bpool"
 )
 
 type PacketTime struct {
@@ -18,7 +20,8 @@ type Packet struct {
 	Caplen uint32    // bytes stored in the file (caplen <= len)
 	Len    uint32    // bytes sent/received
 
-	Data   []byte // packet data
+	Data []byte // packet data
+	Pod  *pool.BPod
 
 	Type    int // protocol type, see LINKTYPE_*
 	DestMac uint64
@@ -27,7 +30,11 @@ type Packet struct {
 	// We only care about IP and UDP headers for pcap
 	Iphdr   Iphdr
 	Udphdr  Udphdr
-	Payload []byte        // remaining non-header bytes
+	Payload []byte // remaining non-header bytes
+}
+
+func (p *Packet) Free() {
+	p.Pod.Return()
 }
 
 // Decode decodes the headers of a Packet.
@@ -94,4 +101,3 @@ func (p *Packet) decodeUdp() {
 	p.Udphdr.Checksum = binary.BigEndian.Uint16(pkt[6:8])
 	p.Payload = pkt[8:]
 }
-

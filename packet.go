@@ -80,8 +80,6 @@ func (p *Packet) decodeIp() {
 	switch p.Iphdr.Protocol {
 	case IP_UDP:
 		p.decodeUdp()
-	case IP_INIP:
-		p.decodeIp()
 	}
 }
 

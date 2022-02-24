@@ -71,7 +71,7 @@ func NewReader(reader io.Reader) (*Reader, error) {
 			// The Pool's New function should generally only return pointer
 			// types, since a pointer can be put into the return interface
 			// value without an allocation:
-			return make([]byte, 1048)
+			return make([]byte, r.Header.SnapLen)
 		},
 	}
 	// r.PacketData = make([]byte, 0, r.Header.SnapLen)
@@ -100,6 +100,10 @@ func (r *Reader) Next() *Packet {
 		Len:    origLen,
 		Data:   data,
 	}
+}
+
+func (r *Reader) Free(packet *Packet) {
+	r.DataPool.Put(packet.Data)
 }
 
 func (r *Reader) read(data []byte) error {

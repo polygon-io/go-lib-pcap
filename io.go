@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"sync"
 	"time"
 )
 
@@ -31,7 +32,7 @@ type Reader struct {
 	fourBytes    []byte
 	twoBytes     []byte
 	sixteenBytes []byte
-	PacketData   []byte
+	DataPool     sync.Pool
 	Header       FileHeader
 }
 
@@ -65,6 +66,14 @@ func NewReader(reader io.Reader) (*Reader, error) {
 		SnapLen:      r.readUint32(),
 		LinkType:     r.readUint32(),
 	}
+	r.DataPool = sync.Pool{
+		New: func() interface{} {
+			// The Pool's New function should generally only return pointer
+			// types, since a pointer can be put into the return interface
+			// value without an allocation:
+			return make([]byte, 1048)
+		},
+	}
 	// r.PacketData = make([]byte, 0, r.Header.SnapLen)
 	return r, nil
 }
@@ -81,7 +90,7 @@ func (r *Reader) Next() *Packet {
 	capLen := asUint32(d[8:12], r.flip)
 	origLen := asUint32(d[12:16], r.flip)
 
-	data := make([]byte, capLen)
+	data := r.DataPool.Get().([]byte)
 	if r.err = r.read(data); r.err != nil {
 		return nil
 	}

@@ -4,9 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"sync"
 	"time"
-
-	pool "github.com/polygon-io/go-lib-bpool"
 )
 
 // FileHeader is the parsed header of a pcap file.
@@ -33,8 +32,17 @@ type Reader struct {
 	fourBytes    []byte
 	twoBytes     []byte
 	sixteenBytes []byte
-	DataPool     *pool.BPool
+	DataPool     *sync.Pool
 	Header       FileHeader
+	Count        int
+}
+
+type PacketData struct {
+	Data []byte
+}
+
+func NewPacketData(size int) *PacketData {
+	return &PacketData{Data: make([]byte, size)}
 }
 
 // NewReader reads pcap data from an io.Reader.
@@ -47,13 +55,9 @@ func NewReader(reader io.Reader) (r *Reader, err error) {
 		sixteenBytes: make([]byte, 16),
 	}
 	switch magic := r.readUint32(); magic {
-	case 0xa1b2c3d4:
-		fallthrough
-	case 0xa1b23c4d:
+	case 0xa1b2c3d4, 0xa1b23c4d:
 		r.flip = false
-	case 0xd4c3b2a1:
-		fallthrough
-	case 0x4d3cb2a1:
+	case 0xd4c3b2a1, 0x4d3cb2a1:
 		r.flip = true
 	default:
 		return nil, fmt.Errorf("pcap: bad magic number: %0x", magic)
@@ -67,8 +71,15 @@ func NewReader(reader io.Reader) (r *Reader, err error) {
 		SnapLen:      r.readUint32(),
 		LinkType:     r.readUint32(),
 	}
-	r.DataPool = pool.NewBPool(100000, int(r.Header.SnapLen))
-	// r.PacketData = make([]byte, 0, r.Header.SnapLen)
+	r.DataPool = &sync.Pool{
+		New: func() interface{} {
+			// The Pool's New function should generally only return pointer
+			// types, since a pointer can be put into the return interface
+			// value without an allocation:
+			r.Count++
+			return NewPacketData(int(r.Header.SnapLen))
+		},
+	}
 	return r, err
 }
 
@@ -84,16 +95,19 @@ func (r *Reader) Next() *Packet {
 	capLen := asUint32(d[8:12], r.flip)
 	origLen := asUint32(d[12:16], r.flip)
 
-	pod := r.DataPool.Get()
-	if r.err = r.read(pod.Bytes); r.err != nil {
+	packetData := r.DataPool.Get().(*PacketData)
+	//fmt.Printf("malloc %p\n", packetData)
+	//packetData.Data = packetData.Data[:capLen]
+	if r.err = r.read(packetData.Data); r.err != nil {
 		return nil
 	}
 	return &Packet{
-		Time:   time.Unix(int64(timeSec), int64(timeUsec)),
-		Caplen: capLen,
-		Len:    origLen,
-		Data:   pod.Bytes,
-		Pod:    pod,
+		Time:       time.Unix(int64(timeSec), int64(timeUsec)),
+		Caplen:     capLen,
+		Len:        origLen,
+		Data:       packetData.Data,
+		PacketData: packetData,
+		Pool:       r.DataPool,
 	}
 }
 

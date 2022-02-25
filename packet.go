@@ -3,9 +3,8 @@ package pcap
 import (
 	"encoding/binary"
 	"errors"
+	"sync"
 	"time"
-
-	pool "github.com/polygon-io/go-lib-bpool"
 )
 
 type PacketTime struct {
@@ -21,7 +20,8 @@ type Packet struct {
 	Len    uint32    // bytes sent/received
 
 	Data []byte // packet data
-	Pod  *pool.BPod
+	PacketData  *PacketData
+	Pool				*sync.Pool
 
 	Type    int // protocol type, see LINKTYPE_*
 	DestMac uint64
@@ -34,7 +34,8 @@ type Packet struct {
 }
 
 func (p *Packet) Free() {
-	p.Pod.Return()
+	//fmt.Printf("free %p\n", p.PacketData)
+	p.Pool.Put(p.PacketData)
 }
 
 // Decode decodes the headers of a Packet.
